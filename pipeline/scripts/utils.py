@@ -286,7 +286,7 @@ def load_neo(filename, object='block', lazy=False, *args, **kwargs):
     except Exception as e:
         # io.close()
         raise e
-    finally:
+    else:
         if not lazy and hasattr(io, 'close'):
             io.close()
 

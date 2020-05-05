@@ -5,6 +5,10 @@ report: "report.rst"
 
 import os
 import sys
+from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
+
+HTTP = HTTPRemoteProvider()
+
 utils_path = os.path.join('..', 'scripts')
 sys.path.append(os.path.join(os.getcwd(), '..'))
 sys.path.append(utils_path)
@@ -75,8 +79,8 @@ rule check_input:
 
 rule enter_data:
     input:
-        data = input_file,
-        script = os.path.join('scripts', CURATION_SCRIPT),
+        data = lambda wildcards: HTTP.remote(input_file(wildcards), keep_local=True),
+        script = os.path.join('scripts/', CURATION_SCRIPT),
         plot_script = os.path.join('scripts', 'plot_traces.py')
     output:
         data = os.path.join('{dir}', '{data_name}.'+NEO_FORMAT),

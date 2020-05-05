@@ -21,8 +21,13 @@ USE_LINK_AS_STAGE_OUTPUT: True
 # To set as key-value pairs
 # Name_of_dataset: /path/to/data/files/
 DATA_SETS:
-    IDIBAPS_161101_rec07_RH: '/home/rgutzen/Sciebo/own/Data/WaveScalES/IDIBAPS/TestData-for-SWAP_WT/161101_rec07_Spontaneous_RH.smr'
-
+    #IDIBAPS_161101_rec07_RH: '/home/rgutzen/Sciebo/own/Data/WaveScalES/IDIBAPS/TestData-for-SWAP_WT/161101_rec07_Spontaneous_RH.smr'
+    #IDIBAPS_1: '/Users/andrew/Data/WaveScalES/hbp-01853_WBS/data-originals/WBS/WT/cond-WBS_type-WT_sub-1/hbp-01853_cond-WBS_type-WT_sub-1_chs-16_area-V1_hem-RH_ana-K100M13_stim-SPN.smr'
+    #IDIBAPS_2: '/Users/andrew/Data/WaveScalES/hbp-01853_WBS/data-originals/WBS/WT/cond-WBS_type-WT_sub-1/hbp-01853_cond-WBS_type-WT_sub-1_chs-32_area-ALL_hem-RH_ana-K100M13_stim-SPN.smr'
+    #IDIBAPS_type_WT_sub_1_chs_32_area_ALL_hem_RH_ana_K100M13_stim_SPN: 'https://object.cscs.ch/v1/AUTH_25b4e28a742d4987a7b6f84c0c36512e/hbp-01853_WBS/data-originals/WBS/WT/cond-WBS_type-WT_sub-1/hbp-01853_cond-WBS_type-WT_sub-1_chs-32_area-ALL_hem-RH_ana-K100M13_stim-SPN.smr'
+    #IDIBAPS_type_WT_sub_5_chs_32_area_ALL_hem_RH_ana_K75M13_stim_SPN: 'https://object.cscs.ch/v1/AUTH_25b4e28a742d4987a7b6f84c0c36512e/hbp-01853_WBS/data-originals/WBS/WT/cond-WBS_type-WT_sub-5/hbp-01853_cond-WBS_type-WT_sub-5_chs-32_area-ALL_hem-RH_ana-K75M13_stim-SPN.smr'
+    IDIBAPS_type_WT_sub_5_chs_32_area_ALL_hem_RH_ana_K75M13_stim_SPN: '/Users/andrew/Data/WaveScalES/hbp-01853_WBS/data-originals/WBS/WT/cond-WBS_type-WT_sub-5/hbp-01853_cond-WBS_type-WT_sub-5_chs-32_area-ALL_hem-RH_ana-K75M13_stim-SPN.smr'
+    #IDIBAPS_3: 'https://object.cscs.ch/v1/AUTH_25b4e28a742d4987a7b6f84c0c36512e/hbp-01853_WBS/data-originals/WBS/WT/cond-WBS_type-WT_sub-2/hbp-01853_cond-WBS_type-WT_sub-2_chs-16_area-M1_hem-RH_ana-K75M13_stim-SPN.smr'
 CURATION_SCRIPT: 'curate_IDIBAPS_data.py'
 
 # Plot settings
