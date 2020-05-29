@@ -4,25 +4,16 @@ import quantities as pq
 import re
 import os
 import sys
-from datetime import datetime
-import json
+
 import neo
 from utils import load_neo, write_neo, none_or_float, none_or_str, time_slice,\
                   parse_string2dict
 
-from fairgraph.client import KGClient
 from fairgraph.minds import Dataset
-from fairgraph.core import Person
 from fairgraph.electrophysiology import MultiChannelMultiTrialRecording
-from fairgraph.analysis import AnalysisScript, Analysis, AnalysisResult, AnalysisConfiguration
 
-from prov_utils import get_version, SeafileDataStore
-
-# fairgraph settings
-#Person.namespace = MultiChannelMultiTrialRecording.namespace
-Person.namespace = Analysis.namespace
-###MultiChannelMultiTrialRecording._path = "/electrophysiology/multitrace/v0.1.2"
-MultiChannelMultiTrialRecording.set_strict_mode(False, "generated_by")
+from prov_utils import (get_version, SeafileDataStore, setup_prov_recording,
+                        store_provenance_metadata)
 
 
 def merge_analogsingals(asigs):
@@ -146,12 +137,8 @@ if __name__ == '__main__':
 
     # === Get data and metadata from KG ===
 
-    start_timestamp = datetime.now()
+    start_timestamp, client, file_store = setup_prov_recording()
 
-    client = KGClient()  # expects environment variable HBP_AUTH_TOKEN
-                         # token can be obtained from https://nexus-iam.humanbrainproject.org/v0/oauth2/authorize
-
-    user = Person.me(client)
     # todo: move dataset name or id to config
     dataset_name = "Cortical activity features in transgenic mouse models of cognitive deficits (Williams Beuren Syndrome)"
     dataset = Dataset.by_name(dataset_name, client, resolved=True)
@@ -179,71 +166,26 @@ if __name__ == '__main__':
     # === Run the actual pre-processing ===
     main(args)
 
-
     # === Now store provenance metadata in KG ===
-    end_timestamp = datetime.fromtimestamp(os.path.getmtime(args.output))
-    #end_timestamp = datetime.now()
-    version, remote_url = get_version("origin")
 
-    script = AnalysisScript(
-        name=f"curate_IDIBAPS_data.py@{version}",
-        script_file=remote_url,
-        code_format="Python",
-        license="GNU General Public License v3.0"
-    )
-    print(script)
+    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
+    assert analysis_label == "curate_IDIBAPS_data"
 
-    config = dict(args._get_kwargs())
-    output_dir = os.path.dirname(args.output)
-    config_file = os.path.join(output_dir,
-                               f"config_curate_IDIBAPS_data_{start_timestamp.isoformat()}.json")
-    with open(config_file, "w") as fp:
-        json.dump(config, fp, indent=4)
-    # write config to JSON file, then store that file (in Seafile?) and get URL
-    # alternatively, could store copy of snakemake config file used for this step
-
-    config = AnalysisConfiguration(
-        name=f"config for curate_IDIBAPS_data run by {user.full_name} at {start_timestamp.isoformat()}",
-        description="command-line arguments",
-        config_file=config_file)
-    print(config)
-
-    output_store = SeafileDataStore(
-        base_dir="/Users/andrew/Seafile/My Library",
-        server_url="https://drive.ebrains.eu",
-        username="adavison")  # todo: take all of these from settings
-    nix_file_url = output_store.get_uri(args.output)
-
-    result = AnalysisResult(  # could instead/also use Multitrace object?
-        name=f"Multi-channel ECoG with annotations, constructed from {input_data.name}, in NIX:Neo format at {start_timestamp.isoformat()}",
-        description="NIX file contains a single block containing a single segment containing a single analog signal",
-        result_file=nix_file_url,
-        #data_type="NIX:Neo",
-        #generated_by=activity,
-        attributed_to=user,
-        derived_from=input_data,
-        timestamp=end_timestamp)
-    print(result)
-
-    activity = Analysis(
-        name=f"curate_IDIBAPS_data run by {user.full_name} at {start_timestamp.isoformat()}",
-        description="preprocess datafiles, to convert them into the format needed for subsequent steps, and add necessary annotations",
+    store_provenance_metadata(
+        client,
+        analysis_label=analysis_label,
+        analysis_script_name=__file__,
+        analysis_description="preprocess datafiles, to convert them into the format needed for subsequent steps, and add necessary annotations",
+        output_path=args.output,
+        output_data_type="Multi-channel ECoG with annotations",
+        output_file_type="NIX:Neo",
+        output_description="NIX file contains a single block containing a single segment containing a single analog signal",
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs()),
+        start_timestamp=start_timestamp,
+        file_store=file_store,
         input_data=input_data,
-        script=script,
-        config=config,
-        timestamp=start_timestamp,
-        end_timestamp=end_timestamp,
-        result=result,
-        started_by=user)
-    print(activity)
-
-    script.save(client)
-    config.save(client)
-    result.save(client)
-    activity.save(client)
-    result.generated_by = activity
-    result.save(client)
-
+    )
 
 """
 Example Seafile links obtained from Desktop client
