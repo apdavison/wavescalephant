@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from elephant.spectral import welch_psd
 from utils import load_neo, save_plot, none_or_float
+from prov_utils import (setup_prov_recording, retrieve_input_data,
+                        store_provenance_metadata)
 
 
 def plot_psd(freqs, psd, highpass_freq, lowpass_freq):
@@ -27,6 +29,21 @@ def plot_psd(freqs, psd, highpass_freq, lowpass_freq):
     return fig
 
 
+def main(args):
+    asig = load_neo(args.data, 'analogsignal')
+
+    freqs, psd = welch_psd(asig,
+                           freq_res=args.psd_freq_res*pq.Hz,
+                           overlap=args.psd_overlap)
+
+    plot_psd(freqs=freqs,
+             psd=psd,
+             highpass_freq=args.highpass_freq,
+             lowpass_freq=args.lowpass_freq)
+
+    save_plot(args.output)
+
+
 if __name__ == '__main__':
     CLI = argparse.ArgumentParser(description=__doc__,
                    formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -44,15 +61,26 @@ if __name__ == '__main__':
                      help="overlap parameter for Welch's algorithm [0-1]")
     args = CLI.parse_args()
 
-    asig = load_neo(args.data, 'analogsignal')
+    start_timestamp, client, file_store = setup_prov_recording()
+    input_data = retrieve_input_data(client, file_store, args.data)
 
-    freqs, psd = welch_psd(asig,
-                           freq_res=args.psd_freq_res*pq.Hz,
-                           overlap=args.psd_overlap)
+    main(args)
 
-    plot_psd(freqs=freqs,
-             psd=psd,
-             highpass_freq=args.highpass_freq,
-             lowpass_freq=args.lowpass_freq)
-
-    save_plot(args.output)
+    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
+    store_provenance_metadata(
+        client,
+        analysis_label=analysis_label,
+        analysis_script_name=__file__,
+        analysis_description=f"Plot power spectrum.",
+        outputs=[{
+            "path": args.output,
+            "data_type": "Figure",
+            "file_type": "application/png",
+            "description": f"Plot of power spectrum"
+        }],
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs()),
+        start_timestamp=start_timestamp,
+        file_store=file_store,
+        input_data=input_data,
+    )

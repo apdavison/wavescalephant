@@ -9,6 +9,8 @@ import argparse
 import os
 from utils import load_neo, write_neo, none_or_str, save_plot, \
                   AnalogSignal2ImageSequence
+from prov_utils import (setup_prov_recording, retrieve_input_data,
+                        store_provenance_metadata)
 
 
 def calculate_contour(img, contour_limit):
@@ -106,19 +108,7 @@ def plot_roi(img, contour):
     return ax
 
 
-if __name__ == '__main__':
-    CLI = argparse.ArgumentParser(description=__doc__,
-                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    CLI.add_argument("--data",    nargs='?', type=str, required=True,
-                     help="path to input data in neo format")
-    CLI.add_argument("--output",  nargs='?', type=str, required=True,
-                     help="path of output file")
-    CLI.add_argument("--output_img",  nargs='?', type=none_or_str,
-                     help="path of output image", default=None)
-    CLI.add_argument("--intensity_threshold", nargs='?', type=float,
-                     help="threshold for mask [0,1]", default=0.5)
-    args = CLI.parse_args()
-
+def main(args):
     block = load_neo(args.data)
     block = AnalogSignal2ImageSequence(block)
 
@@ -153,3 +143,47 @@ if __name__ == '__main__':
     save_plot(args.output_img)
 
     write_neo(args.output, block)
+
+
+if __name__ == '__main__':
+    CLI = argparse.ArgumentParser(description=__doc__,
+                   formatter_class=argparse.RawDescriptionHelpFormatter)
+    CLI.add_argument("--data",    nargs='?', type=str, required=True,
+                     help="path to input data in neo format")
+    CLI.add_argument("--output",  nargs='?', type=str, required=True,
+                     help="path of output file")
+    CLI.add_argument("--output_img",  nargs='?', type=none_or_str,
+                     help="path of output image", default=None)
+    CLI.add_argument("--intensity_threshold", nargs='?', type=float,
+                     help="threshold for mask [0,1]", default=0.5)
+    args = CLI.parse_args()
+
+    start_timestamp, client, file_store = setup_prov_recording()
+    input_data = retrieve_input_data(client, file_store, args.data)
+
+    main(args)
+
+    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
+    store_provenance_metadata(
+        client,
+        analysis_label=analysis_label,
+        analysis_script_name=__file__,
+        analysis_description="Selects a region of interest (ROI) by thresholding the intensity signal.",
+        outputs=[{
+            "path": args.output,
+            "data_type": "Image sequence saved as AnalogSignal??",
+            "file_type": "NIX:Neo",
+            "description": "Masked image sequence based on ECoG activity??"
+        },
+        {
+            "path": args.output_img,
+            "data_type": "Figure",
+            "file_type": "application/png",
+            "description": f"Plot of region of interest"
+        }],
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs()),
+        start_timestamp=start_timestamp,
+        file_store=file_store,
+        input_data=input_data,
+    )

@@ -7,6 +7,8 @@ import neo
 import os
 import sys
 from utils import write_neo, load_neo
+from prov_utils import (setup_prov_recording, retrieve_input_data,
+                        store_provenance_metadata)
 
 
 def normalize(asig, normalize_by):
@@ -34,6 +36,18 @@ def normalize(asig, normalize_by):
     del norm_asig
     return asig
 
+def main(args):
+    block = load_neo(args.data)
+
+    asig = normalize(block.segments[0].analogsignals[0], args.normalize_by)
+
+    asig.name += ""
+    asig.description += "Normalized by {} ({})."\
+                        .format(args.normalize_by, os.path.basename(__file__))
+    block.segments[0].analogsignals[0] = asig
+
+    write_neo(args.output, block)
+
 
 if __name__ == '__main__':
     CLI = argparse.ArgumentParser(description=__doc__,
@@ -46,13 +60,26 @@ if __name__ == '__main__':
                      help="division factor: 'max', 'mean', or 'median'")
     args = CLI.parse_args()
 
-    block = load_neo(args.data)
+    start_timestamp, client, file_store = setup_prov_recording()
+    input_data = retrieve_input_data(client, file_store, args.data)
 
-    asig = normalize(block.segments[0].analogsignals[0], args.normalize_by)
+    main(args)
 
-    asig.name += ""
-    asig.description += "Normalized by {} ({})."\
-                        .format(args.normalize_by, os.path.basename(__file__))
-    block.segments[0].analogsignals[0] = asig
-
-    write_neo(args.output, block)
+    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
+    store_provenance_metadata(
+        client,
+        analysis_label=analysis_label,
+        analysis_script_name=__file__,
+        analysis_description=f"Divides all signals by their {args.normalize_by} value.",
+        outputs=[{
+            "path": args.output,
+            "data_type": "Multi-channel ECoG with annotations",
+            "file_type": "NIX:Neo",
+            "description": f"Signals divided by their {args.normalize_by} value."
+        }],
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs()),
+        start_timestamp=start_timestamp,
+        file_store=file_store,
+        input_data=input_data,
+    )

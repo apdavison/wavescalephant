@@ -13,7 +13,7 @@ from fairgraph.minds import Dataset
 from fairgraph.electrophysiology import MultiChannelMultiTrialRecording
 
 from prov_utils import (get_version, SeafileDataStore, setup_prov_recording,
-                        store_provenance_metadata)
+                        store_provenance_metadata, retrieve_input_data_from_dataset)
 
 
 def merge_analogsingals(asigs):
@@ -141,27 +141,7 @@ if __name__ == '__main__':
 
     # todo: move dataset name or id to config
     dataset_name = "Cortical activity features in transgenic mouse models of cognitive deficits (Williams Beuren Syndrome)"
-    dataset = Dataset.by_name(dataset_name, client, resolved=True)
-
-    # get list of traces belonging to the dataset
-    traces = MultiChannelMultiTrialRecording.list(client,
-                                                  part_of=dataset,
-                                                  api="nexus",
-                                                  use_cache=False,
-                                                  size=10000)
-
-    # extract trace that matches the input filename
-    #   todo: specify either the MCMTR object id in DATA_SETS, rather than hard-coding the URL,
-    #         or specify filters to be applied to the trace query (e.g. wild-type, V1, ...)
-    input_data = None
-    for trace in traces:
-        if os.path.basename(args.data) in trace.data_location.location:
-            input_data = trace
-            print(input_data)
-            break
-    if input_data is None:
-        raise Exception("Data file not found in Knowledge Graph")
-
+    input_data = retrieve_input_data_from_dataset(client, dataset_name, args.data)
 
     # === Run the actual pre-processing ===
     main(args)
@@ -176,10 +156,12 @@ if __name__ == '__main__':
         analysis_label=analysis_label,
         analysis_script_name=__file__,
         analysis_description="preprocess datafiles, to convert them into the format needed for subsequent steps, and add necessary annotations",
-        output_path=args.output,
-        output_data_type="Multi-channel ECoG with annotations",
-        output_file_type="NIX:Neo",
-        output_description="NIX file contains a single block containing a single segment containing a single analog signal",
+        outputs=[{
+            "path": args.output,
+            "data_type": "Multi-channel ECoG with annotations",
+            "file_type": "NIX:Neo",
+            "description": "NIX file contains a single block containing a single segment containing a single analog signal",
+        }],
         code_licence="GNU General Public License v3.0",
         config=dict(args._get_kwargs()),
         start_timestamp=start_timestamp,

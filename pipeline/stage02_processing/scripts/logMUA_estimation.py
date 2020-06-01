@@ -9,6 +9,8 @@ import argparse
 import os
 from utils import load_neo, write_neo, none_or_float, none_or_str, none_or_int,\
                   time_slice, save_plot
+from prov_utils import (setup_prov_recording, retrieve_input_data,
+                        store_provenance_metadata)
 
 def logMUA_estimation(asig, highpass_freq, lowpass_freq, logMUA_rate,
                       psd_overlap, fft_slice):
@@ -112,6 +114,52 @@ def plot_logMUA_estimation(asig, logMUA_asig, highpass_freq, lowpass_freq,
     return ax
 
 
+def main(args):
+    block = load_neo(args.data)
+
+    logMUA_rate = None if args.logMUA_rate is None \
+                  else args.logMUA_rate*pq.Hz
+
+    fft_slice = None if args.fft_slice is None \
+                else args.fft_slice*pq.s
+
+    asig = logMUA_estimation(block.segments[0].analogsignals[0],
+                             highpass_freq=args.highpass_freq*pq.Hz,
+                             lowpass_freq=args.lowpass_freq*pq.Hz,
+                             logMUA_rate=logMUA_rate,
+                             psd_overlap=args.psd_overlap,
+                             fft_slice=fft_slice)
+
+    #    if args.channels[0] is not None:
+    # WARNING! TypeError: 'NoneType' object is not subscriptable if it is None
+    # (the condition args.channel[0] cannot be evaluated)
+
+    if args.channels is not None:
+        if not len(args.output_img) == len(args.channels):
+            raise InputError("The number of plotting channels must "\
+                           + "correspond to the number of image output paths!")
+        for output_img, channel in zip(args.output_img, args.channels):
+            #[output_img] = output_img
+            # otherwise... "TypeError: expected str, bytes or os.PathLike object, not list"
+            plot_logMUA_estimation(asig=block.segments[0].analogsignals[0],
+                                   logMUA_asig=asig,
+                                   highpass_freq=args.highpass_freq*pq.Hz,
+                                   lowpass_freq=args.lowpass_freq*pq.Hz,
+                                   t_start=args.t_start,
+                                   t_stop=args.t_stop,
+                                   channel=channel)
+            save_plot(output_img)
+
+    asig.name += ""
+    asig.description += "Estimated logMUA signal [{}, {}] Hz ({}). "\
+                        .format(args.highpass_freq, args.lowpass_freq,
+                                os.path.basename(__file__))
+    block.segments[0].analogsignals[0] = asig
+
+    write_neo(args.output, block)
+
+
+
 if __name__ == '__main__':
     CLI = argparse.ArgumentParser(description=__doc__,
                    formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -139,45 +187,36 @@ if __name__ == '__main__':
                      help="list of channels to plot")
     args = CLI.parse_args()
 
-    block = load_neo(args.data)
+    start_timestamp, client, file_store = setup_prov_recording()
+    input_data = retrieve_input_data(client, file_store, args.data)
 
-    logMUA_rate = None if args.logMUA_rate is None \
-                  else args.logMUA_rate*pq.Hz
+    main(args)
 
-    fft_slice = None if args.fft_slice is None \
-                else args.fft_slice*pq.s
-
-    asig = logMUA_estimation(block.segments[0].analogsignals[0],
-                             highpass_freq=args.highpass_freq*pq.Hz,
-                             lowpass_freq=args.lowpass_freq*pq.Hz,
-                             logMUA_rate=logMUA_rate,
-                             psd_overlap=args.psd_overlap,
-                             fft_slice=fft_slice)
-
-#    if args.channels[0] is not None:
-# WARNING! TypeError: 'NoneType' object is not subscriptable if it is None
-# (the condition args.channel[0] cannot be evaluated)
-
+    outputs = [{
+        "path": args.output,
+        "data_type": "Multi-channel ECoG with annotations",
+        "file_type": "NIX:Neo",
+        "description": "logMUA estimation"
+    }]
     if args.channels is not None:
-        if not len(args.output_img) == len(args.channels):
-            raise InputError("The number of plotting channels must "\
-                           + "correspond to the number of image output paths!")
-        for output_img, channel in zip(args.output_img, args.channels):
-            #[output_img] = output_img
-            # otherwise... "TypeError: expected str, bytes or os.PathLike object, not list"
-            plot_logMUA_estimation(asig=block.segments[0].analogsignals[0],
-                                   logMUA_asig=asig,
-                                   highpass_freq=args.highpass_freq*pq.Hz,
-                                   lowpass_freq=args.lowpass_freq*pq.Hz,
-                                   t_start=args.t_start,
-                                   t_stop=args.t_stop,
-                                   channel=channel)
-            save_plot(output_img)
+        for channel, path in zip(args.channels, args.output_img):
+            outputs.append({
+                "path": path,
+                "data_type": "Figure",
+                "file_type": "application/png",
+                "description": f"Plot of logMUA estimation, channel {channel}"
+            })
 
-    asig.name += ""
-    asig.description += "Estimated logMUA signal [{}, {}] Hz ({}). "\
-                        .format(args.highpass_freq, args.lowpass_freq,
-                                os.path.basename(__file__))
-    block.segments[0].analogsignals[0] = asig
-
-    write_neo(args.output, block)
+    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
+    store_provenance_metadata(
+        client,
+        analysis_label=analysis_label,
+        analysis_script_name=__file__,
+        analysis_description="logMUA estimation",
+        outputs=outputs,
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs()),
+        start_timestamp=start_timestamp,
+        file_store=file_store,
+        input_data=input_data,
+    )
