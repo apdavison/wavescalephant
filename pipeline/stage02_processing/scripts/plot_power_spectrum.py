@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from elephant.spectral import welch_psd
 from utils import load_neo, save_plot, none_or_float
-from prov_utils import (setup_prov_recording, retrieve_input_data,
-                        store_provenance_metadata)
+from prov_utils import AnalysisProvenanceRecorder
 
 
 def plot_psd(freqs, psd, highpass_freq, lowpass_freq):
@@ -61,17 +60,10 @@ if __name__ == '__main__':
                      help="overlap parameter for Welch's algorithm [0-1]")
     args = CLI.parse_args()
 
-    start_timestamp, client, file_store = setup_prov_recording()
-    input_data = retrieve_input_data(client, file_store, args.data)
-
-    main(args)
-
-    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
-    store_provenance_metadata(
-        client,
-        analysis_label=analysis_label,
-        analysis_script_name=__file__,
-        analysis_description=f"Plot power spectrum.",
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description="Plot power spectrum.",
+        input_data=(args.original_data, args.processed_data),
         outputs=[{
             "path": args.output,
             "data_type": "Figure",
@@ -79,8 +71,7 @@ if __name__ == '__main__':
             "description": f"Plot of power spectrum"
         }],
         code_licence="GNU General Public License v3.0",
-        config=dict(args._get_kwargs()),
-        start_timestamp=start_timestamp,
-        file_store=file_store,
-        input_data=input_data,
+        config=dict(args._get_kwargs())
     )
+
+    prov_recorder.capture(main, args)

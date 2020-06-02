@@ -4,6 +4,7 @@ import quantities as pq
 from scipy.signal import argrelmin
 import argparse
 from utils import load_neo, write_neo, remove_annotations
+from prov_utils import AnalysisProvenanceRecorder
 
 
 def detect_minima(asig, order):
@@ -26,6 +27,19 @@ def detect_minima(asig, order):
     evt.annotations.update(asig.annotations)
     return evt
 
+
+def main(args):
+    block = load_neo(args.data)
+
+    asig = block.segments[0].analogsignals[0]
+
+    transition_event = detect_minima(asig, args.order)
+
+    block.segments[0].events.append(transition_event)
+
+    write_neo(args.output, block)
+
+
 if __name__ == '__main__':
     CLI = argparse.ArgumentParser(description=__doc__,
                    formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -37,12 +51,18 @@ if __name__ == '__main__':
                      help="number of neighbouring points to compare")
     args = CLI.parse_args()
 
-    block = load_neo(args.data)
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description=f"Plot processed trace vs original trace.",
+        input_data=args.data,
+        outputs=[{
+            "path": args.output,
+            "data_type": "ECoG data with events for minima",
+            "file_type": "Nix:Neo",
+            "description": "ECoG data with events for minima"
+        }],
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs())
+    )
 
-    asig = block.segments[0].analogsignals[0]
-
-    transition_event = detect_minima(asig, args.order)
-
-    block.segments[0].events.append(transition_event)
-
-    write_neo(args.output, block)
+    prov_recorder.capture(main, args)

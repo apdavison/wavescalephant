@@ -62,7 +62,7 @@ def setup_prov_recording():
 
 def retrieve_input_data(client, file_store, file_path, cls=AnalysisResult):
 
-    input_data_uri = file_store.get_uri(file_path)
+    input_data_uri = file_store.get_uri(os.path.realpath(file_path))  # resolve symlinks
     digest = file_hash(file_path)
 
     sleep(30)  # to allow the KG to become consistent. TODO: first try without sleep, retry after sleep on failure
@@ -171,7 +171,7 @@ def store_provenance_metadata(
     input_ids = ", ".join([inp.id for inp in as_list(input_data)])
     results = []
     for output in outputs:
-        output_file_url = file_store.get_uri(output["path"])
+        output_file_url = file_store.get_uri(os.path.realpath(output["path"]))  # resolve symlinks
         end_timestamp = datetime.fromtimestamp(os.path.getmtime(output["path"]))
 
         result = AnalysisResult(  # could instead/also use Multitrace object?
@@ -220,3 +220,40 @@ def file_hash(file_path):
             fh.update(buffer)
             buffer = fp.read(BUFFER_SIZE)
     return fh.hexdigest()
+
+
+class AnalysisProvenanceRecorder:
+
+    def __init__(self, script_name, description, input_data, outputs,
+                 code_licence=None, config=None):
+        self.script_name = script_name
+        self.description = description
+        self.input_data = input_data
+        if isinstance(input_data, str):
+            self.input_data = [input_data]
+        self.outputs = outputs
+        self.code_licence = code_licence
+        self.config = config
+
+    def capture(self, func, args):
+        start_timestamp, client, file_store = setup_prov_recording()
+        input_data = [
+            retrieve_input_data(client, file_store, file_path)
+            for file_path in self.input_data
+        ]
+
+        func(args)
+
+        analysis_label, ext = os.path.splitext(os.path.basename(self.script_name))
+        store_provenance_metadata(
+            client,
+            analysis_label=analysis_label,
+            analysis_script_name=self.script_name,
+            analysis_description=f"Plot processed trace vs original trace.",
+            outputs=self.outputs,
+            code_licence=self.code_licence,
+            config=self.config,
+            start_timestamp=start_timestamp,
+            file_store=file_store,
+            input_data=input_data,
+        )

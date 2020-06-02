@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from utils import load_neo, write_neo, time_slice, none_or_int,\
                   remove_annotations, save_plot
+from prov_utils import AnalysisProvenanceRecorder
+
 
 def detect_transitions(asig, transition_phase):
     # ToDo: replace with elephant function
@@ -97,25 +99,7 @@ def plot_hilbert_phase(asig, event, channel):
     return ax
 
 
-if __name__ == '__main__':
-    CLI = argparse.ArgumentParser(description=__doc__,
-                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    CLI.add_argument("--data", nargs='?', type=str, required=True,
-                     help="path to input data in neo format")
-    CLI.add_argument("--output", nargs='?', type=str, required=True,
-                     help="path of output file")
-    CLI.add_argument("--output_img", nargs='?', type=lambda v: v.split(','),
-                     default='None', help="path(s) of output figure(s)")
-    CLI.add_argument("--transition_phase", nargs='?', type=float, default=-1.570796,
-                     help="phase to use as threshold for the upward transition")
-    CLI.add_argument("--plot_channels", nargs='+', type=none_or_int, default=None,
-                     help="list of channels to plot")
-    CLI.add_argument("--plot_tstart", nargs='?', type=float, default=0,
-                     help="start time in seconds")
-    CLI.add_argument("--plot_tstop",  nargs='?', type=float, default=10,
-                     help="stop time in seconds")
-    args = CLI.parse_args()
-
+def main(args):
     block = load_neo(args.data)
 
     asig = block.segments[0].analogsignals[0]
@@ -136,3 +120,49 @@ if __name__ == '__main__':
                                event=time_slice(transition_event, args.plot_tstart, args.plot_tstop),
                                channel=int(channel))
             save_plot(output)
+
+
+if __name__ == '__main__':
+    CLI = argparse.ArgumentParser(description=__doc__,
+                   formatter_class=argparse.RawDescriptionHelpFormatter)
+    CLI.add_argument("--data", nargs='?', type=str, required=True,
+                     help="path to input data in neo format")
+    CLI.add_argument("--output", nargs='?', type=str, required=True,
+                     help="path of output file")
+    CLI.add_argument("--output_img", nargs='?', type=lambda v: v.split(','),
+                     default='None', help="path(s) of output figure(s)")
+    CLI.add_argument("--transition_phase", nargs='?', type=float, default=-1.570796,
+                     help="phase to use as threshold for the upward transition")
+    CLI.add_argument("--plot_channels", nargs='+', type=none_or_int, default=None,
+                     help="list of channels to plot")
+    CLI.add_argument("--plot_tstart", nargs='?', type=float, default=0,
+                     help="start time in seconds")
+    CLI.add_argument("--plot_tstop",  nargs='?', type=float, default=10,
+                     help="stop time in seconds")
+    args = CLI.parse_args()
+
+    outputs = [{
+        "path": args.output,
+        "data_type": "ECoG data with transition events",
+        "file_type": "Nix:Neo",
+        "description": ("UP transitions: A change of the hilbert phase from < transtion_phase"
+                        "to > transition_phase, followed by a peak (phase = 0).")
+    }]
+    if args.plot_channels:
+        for output_path, channel in zip(args.output_img, args.plot_channels):
+            outputs.append({
+                "path": output_path,
+                "data_type": "Figure",
+                "file_type": "application/png",
+                "description": f"Hilbert phase (channel {channel})"
+            })
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description=f"Calculate Hilbert phase and store transitions",
+        input_data=args.data,
+        outputs=outputs,
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs())
+    )
+
+    prov_recorder.capture(main, args)

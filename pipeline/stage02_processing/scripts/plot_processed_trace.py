@@ -4,8 +4,7 @@ import argparse
 import os
 import random
 from utils import load_neo, save_plot, time_slice
-from prov_utils import (setup_prov_recording, retrieve_input_data,
-                        store_provenance_metadata)
+from prov_utils import AnalysisProvenanceRecorder
 
 
 def plot_traces(original_asig, processed_asig, channel):
@@ -63,29 +62,18 @@ if __name__ == '__main__':
                      help="channel to plot")
     args = CLI.parse_args()
 
-    start_timestamp, client, file_store = setup_prov_recording()
-    input_data = [
-        retrieve_input_data(client, file_store, args.original_data),
-        retrieve_input_data(client, file_store, args.processed_data),
-    ]
-
-    main(args)
-
-    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
-    store_provenance_metadata(
-        client,
-        analysis_label=analysis_label,
-        analysis_script_name=__file__,
-        analysis_description=f"Plot processed trace vs original trace.",
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description="Plot processed trace vs original trace.",
+        input_data=(args.original_data, args.processed_data),
         outputs=[{
             "path": args.output,
             "data_type": "Figure",
             "file_type": "application/png",
-            "description": f"Plot of processed trace vs original trace"
+            "description": "Plot of processed trace vs original trace"
         }],
         code_licence="GNU General Public License v3.0",
-        config=dict(args._get_kwargs()),
-        start_timestamp=start_timestamp,
-        file_store=file_store,
-        input_data=input_data,
+        config=dict(args._get_kwargs())
     )
+
+    prov_recorder.capture(main, args)

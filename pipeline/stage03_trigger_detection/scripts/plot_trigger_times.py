@@ -5,6 +5,7 @@ import argparse
 import random
 import os
 from utils import none_or_int, load_neo, save_plot, time_slice
+from prov_utils import AnalysisProvenanceRecorder
 
 
 def plot_trigger_times(asig, event, channel):
@@ -53,21 +54,7 @@ def plot_states(times, labels, ax, t_start, t_stop, label=''):
     return None
 
 
-if __name__ == '__main__':
-    CLI = argparse.ArgumentParser(description=__doc__,
-                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    CLI.add_argument("--data", nargs='?', type=str, required=True,
-                     help="path to input data in neo format")
-    CLI.add_argument("--output", nargs='?', type=lambda v: v.split(','),
-                     required=True, help="path of output figure(s)")
-    CLI.add_argument("--t_start", nargs='?', type=float, default=0,
-                     help="start time in seconds")
-    CLI.add_argument("--t_stop", nargs='?', type=float, default=10,
-                     help="stop time in seconds")
-    CLI.add_argument("--channels", nargs='+', type=none_or_int, default=None,
-                     help="list of channels to plot")
-    args = CLI.parse_args()
-
+def main(args):
     block = load_neo(args.data)
     asig = block.segments[0].analogsignals[0]
 
@@ -83,3 +70,38 @@ if __name__ == '__main__':
                            event=event,
                            channel=channel)
         save_plot(output)
+
+
+if __name__ == '__main__':
+    CLI = argparse.ArgumentParser(description=__doc__,
+                   formatter_class=argparse.RawDescriptionHelpFormatter)
+    CLI.add_argument("--data", nargs='?', type=str, required=True,
+                     help="path to input data in neo format")
+    CLI.add_argument("--output", nargs='?', type=lambda v: v.split(','),
+                     required=True, help="path of output figure(s)")
+    CLI.add_argument("--t_start", nargs='?', type=float, default=0,
+                     help="start time in seconds")
+    CLI.add_argument("--t_stop", nargs='?', type=float, default=10,
+                     help="stop time in seconds")
+    CLI.add_argument("--channels", nargs='+', type=none_or_int, default=None,
+                     help="list of channels to plot")
+    args = CLI.parse_args()
+
+    outputs = []
+    for output_path, channel in zip(args.output, args.channels):
+        outputs.append({
+            "path": output_path,
+            "data_type": "Figure",
+            "file_type": "application/png",
+            "description": f"Plot of trigger times for channel {channel}"
+        })
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description=f"Plot trigger times.",
+        input_data=args.data,
+        outputs=outputs,
+        code_licence="GNU General Public License v3.0",
+        config=dict(args._get_kwargs())
+    )
+
+    prov_recorder.capture(main, args)

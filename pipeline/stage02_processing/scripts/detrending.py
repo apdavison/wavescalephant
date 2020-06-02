@@ -6,8 +6,7 @@ import neo
 import argparse
 import os
 from utils import load_neo, write_neo
-from prov_utils import (setup_prov_recording, retrieve_input_data,
-                        store_provenance_metadata)
+from prov_utils import AnalysisProvenanceRecorder
 
 
 def detrending(signal, order):
@@ -74,17 +73,10 @@ if __name__ == '__main__':
                      help="detrending order")
     args = CLI.parse_args()
 
-    start_timestamp, client, file_store = setup_prov_recording()
-    input_data = retrieve_input_data(client, file_store, args.data)
-
-    main(args)
-
-    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
-    store_provenance_metadata(
-        client,
-        analysis_label=analysis_label,
-        analysis_script_name=__file__,
-        analysis_description="Plot pre-processed datafiles",
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description="Plot pre-processed datafiles",
+        input_data=(args.original_data, args.processed_data),
         outputs=[{
             "path": args.output,
             "data_type": "Multi-channel ECoG with annotations",
@@ -92,8 +84,7 @@ if __name__ == '__main__':
             "description": "Detrended recording"
         }],
         code_licence="GNU General Public License v3.0",
-        config=dict(args._get_kwargs()),
-        start_timestamp=start_timestamp,
-        file_store=file_store,
-        input_data=input_data,
+        config=dict(args._get_kwargs())
     )
+
+    prov_recorder.capture(main, args)

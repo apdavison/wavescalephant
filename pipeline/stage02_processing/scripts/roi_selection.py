@@ -9,8 +9,7 @@ import argparse
 import os
 from utils import load_neo, write_neo, none_or_str, save_plot, \
                   AnalogSignal2ImageSequence
-from prov_utils import (setup_prov_recording, retrieve_input_data,
-                        store_provenance_metadata)
+from prov_utils import AnalysisProvenanceRecorder
 
 
 def calculate_contour(img, contour_limit):
@@ -158,17 +157,10 @@ if __name__ == '__main__':
                      help="threshold for mask [0,1]", default=0.5)
     args = CLI.parse_args()
 
-    start_timestamp, client, file_store = setup_prov_recording()
-    input_data = retrieve_input_data(client, file_store, args.data)
-
-    main(args)
-
-    analysis_label, ext = os.path.splitext(os.path.basename(__file__))
-    store_provenance_metadata(
-        client,
-        analysis_label=analysis_label,
-        analysis_script_name=__file__,
-        analysis_description="Selects a region of interest (ROI) by thresholding the intensity signal.",
+    prov_recorder = AnalysisProvenanceRecorder(
+        script_name=__file__,
+        description="Selects a region of interest (ROI) by thresholding the intensity signal.",
+        input_data=args.data,
         outputs=[{
             "path": args.output,
             "data_type": "Image sequence saved as AnalogSignal??",
@@ -182,8 +174,7 @@ if __name__ == '__main__':
             "description": f"Plot of region of interest"
         }],
         code_licence="GNU General Public License v3.0",
-        config=dict(args._get_kwargs()),
-        start_timestamp=start_timestamp,
-        file_store=file_store,
-        input_data=input_data,
+        config=dict(args._get_kwargs())
     )
+
+    prov_recorder.capture(main, args)
